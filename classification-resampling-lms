@@ -1,0 +1,196 @@
+### Classification, Reseampling and Linear Model Selection
+
+## Load data and dependencies
+```{r}
+data2_3 <- read.csv("C:/Users/zachw/Desktop/projects/Econ556XMidterm/data2_3.csv", header=TRUE)
+View(data2_3)
+
+library(leaps)
+library(ggvis)
+library(glmnet)
+```
+
+#fitting data on regular linear regression
+```{r}
+fit1 <- lm(Y ~., data=data2_3)
+str(data2_3)
+summary(fit1)
+```
+>The p-value corresponding to the F-statistic of 265.4 is 2.2e-16, which indicates that there is clear evidence of a strong relationship between “Y” and some of the  predictors.
+
+>To assess which specific predictors are associated with statistically significant relationships to the response, we examine each predictor's corresponding t-statistic. We can conclude from this that X3, X5, X6, and X10 are strongly associated with the response, all having signifiance codes between 0 and .001. X9 is moderately associated, with a corresponding code between .001 and .01, and X1 is somewhat associated, with a corresponding code between .01 and .05.
+
+>Of particular interest is variable X3. The coefficient of  X3 suggests that the average effect of an increase of 1 X3 is an increase of 3.97 in “Y” (all other predictors remaining constant). 
+
+#using reg subset selection to determine which variables are in each given model
+```{r}
+regfit.full <- regsubsets(Y ~ ., data=data2_3, nvmax=11)
+reg.summary <- summary(regfit.full)
+names(reg.summary)
+reg.summary$rsq
+reg.summary$bic
+
+#plotting rss
+par(mfrow = c(2, 2))
+plot(reg.summary$rss, xlab="Number of Variables", ylab="RSS", type="b")
+best_rss <- which.min(reg.summary$rss)
+points(best_rss, reg.summary$rss[best_rss],
+       col="red", cex=2, pch=20)
+
+#plotting adjrsq
+plot(reg.summary$adjr2, xlab="Number of Variables", ylab="Adjusted RSq", type="b")
+best_adjr2 <- which.max(reg.summary$adjr2)
+points(best_adjr2, reg.summary$adjr2[best_adjr2],
+       col="red", cex=2, pch=20)
+
+#plotting Cp
+plot(reg.summary$cp, xlab="Number of Variables", ylab="Cp", type='b')
+best_cp = which.min(reg.summary$cp)
+points(best_cp, reg.summary$cp[best_cp], 
+       col="red", cex=2, pch=20)
+
+#plotting BIC
+plot(reg.summary$bic, xlab="Number of Variables", ylab="BIC", type='b')
+best_bic = which.min(reg.summary$bic)
+points(best_bic, reg.summary$bic[best_bic], 
+       col="red", cex=2, pch=20)
+```
+>With an 11-variable model, we would use RSS to predict Y using X1,...X11, as this model minimizes RSS at 11 variables. Compared to any other amount of variables used to regress on Y (from 1 to 10) 11 minmizes RSS, yielding a more accurate prediction model compared to Adjusted R-Squared, CP, and BIC. 
+
+>Below are the results from the chosen model. The first is a plot displaying selected variables, ranked according to RSS. Then, the coefficients associated with the RSS 11-variable model.
+
+```{r}
+plot(regfit.full, scale="r2")
+coef(regfit.full, 11)
+```
+
+#regsubset again with forward stepwise model selection
+```{r}
+regfit.fwd = regsubsets(Y ~., data=data2_3, nvmax=11, method ="forward")
+reg.fwd.summary <- summary(regfit.fwd)
+names(reg.fwd.summary)
+
+#plotting rss
+par(mfrow = c(2, 2))
+plot(reg.fwd.summary$rss, xlab="Number of Variables", ylab="RSS", type="b")
+best_rss <- which.min(reg.fwd.summary$rss)
+points(best_rss, reg.fwd.summary$rss[best_rss],
+       col="red", cex=2, pch=20)
+
+#plotting adjrsq
+plot(reg.fwd.summary$adjr2, xlab="Number of Variables", ylab="Adjusted RSq", type="b")
+best_adjr2 <- which.max(reg.fwd.summary$adjr2)
+points(best_adjr2, reg.fwd.summary$adjr2[best_adjr2],
+       col="red", cex=2, pch=20)
+
+#plotting Cp
+plot(reg.fwd.summary$cp, xlab="Number of Variables", ylab="Cp", type='b')
+best_cp = which.min(reg.fwd.summary$cp)
+points(best_cp, reg.fwd.summary$cp[best_cp], 
+       col="red", cex=2, pch=20)
+
+#plotting BIC
+plot(reg.fwd.summary$bic, xlab="Number of Variables", ylab="BIC", type='b')
+best_bic = which.min(reg.fwd.summary$bic)
+points(best_bic, reg.fwd.summary$bic[best_bic], 
+       col="red", cex=2, pch=20)
+```
+>Once again, for 11-variable model, RSS performs the best in forward-stepwise selection, reinforcing an RSS 11-var model as the optimal model for regressing Y on vars X1,...X11.
+
+>Below are the results from this forward-stepwise selection. Again, the first is a plot displaying selected variables, ranked according to RSS. Then, the coefficients associated with the RSS 11-variable foward-stewpwise optimal model selection. 
+
+```{r}
+plot(regfit.fwd, scale="r2")
+coef(regfit.fwd, 11)
+```
+
+#Running Ridge Regression of Y on predictors using optimal choice of lambda
+```{r}
+y <- data2_3$Y
+x <- data.matrix(data2_3[, c('X1', 'X2', 'X3', 'X4', 'X5', 'X6',
+                             'X7', 'X8', 'X9', 'X10', 'X11')])
+
+#fitting ridge regression model
+model.ridge <- glmnet(x, y, alpha=0)
+
+#summary of the fit ridge regression model
+summary(model.ridge)
+
+#choosing value for lambda to produce lowest test mean squared error, MSE, by using k-fold cross-validation
+cv_model <- cv.glmnet(x, y, alpha = 0)
+best_lambda <- cv_model$lambda.min
+best_lambda
+
+#plotting test MSE by our lambda value
+plot(cv_model)
+```
+>So, we now know that the lambda value that minimizes the test MSE is .1871747. Next, we can report the results of this optimal lambda value by analyzing this model to obtain coefficient estimates associated with the model.
+
+>First, we will display the coefficients associated with the model. Then, we will produce a Trace plot to demonstrate how coefficient estimates change as a result of the lambda value increasing. Finally, we will calculate the R-squared of the model. 
+
+```{r}
+#coefficients
+best_model <- glmnet(x, y, alpha = 0, lambda=best_lambda)
+coef(best_model)
+
+#trace plot
+plot(model.ridge, xvar="lambda")
+
+#R-squared
+y_predicted <- predict(model.ridge, s=best_lambda, newx=x)
+#SST
+sst <- sum((y - mean(y))^2)
+#SSE
+sse <- sum((y_predicted - y)^2)
+#R-squared formula
+rsq <- 1 - sse/sst
+#R-squared value
+rsq
+```
+>With the R-Squared value being .8648219, we can infer that the best model (using the minimized lambda value) was able to explain approximately 86.5% of the variation in the response values of the training data.
+
+#Running Lasso Regression of Y on predictors using optimal choice of lambda
+```{r}
+y <- data2_3$Y
+x <- data.matrix(data2_3[, c('X1', 'X2', 'X3', 'X4', 'X5', 'X6',
+                             'X7', 'X8', 'X9', 'X10')])
+
+#fitting lasso regression model
+model.lasso <- glmnet(x, y, alpha=1)
+
+#summary of lasso regression model
+summary(model.lasso)
+
+#k-fold cross validation to find optimal lambda value
+cv_model <- cv.glmnet(x, y, alpha=1)
+best_lambda <- cv_model$lambda.min
+best_lambda
+
+#plotting test MSE by our lambda value
+plot(cv_model) 
+```
+>So, we now know that the lambda value that minimizes the test MSE is .037660776. Next, we can report the results of this optimal lambda value by analyzing this model to obtain coefficient estimates associated with the model.
+
+>First, we will display the coefficients associated with the model. Then, we will calculate the R-squared of the model. Note, some coefficients are dropped from the model altogether becuase in lasso regression, they are not influential enough on the response.
+
+```{r}
+#coefficients
+best_model <- glmnet(x, y, alpha=1, lambda=best_lambda)
+coef(best_model)
+
+#R-squared
+y_predicted <- predict(best_model, s=best_lambda, newx=x)
+
+#SST
+sst <- sum((y - mean(y))^2)
+
+#SSE
+sse <- sum((y_predicted - y)^2)
+
+#R-squared formula
+rsq <- 1 - sse/sst
+
+#R-squared value
+rsq
+```
+>With the R-Squared value being .8681114, we can infer that the best model (using the minimized lambda value) was able to explain approximately 86.8% of the variation in the response values of the training data.
