@@ -1,3 +1,2 @@
 # ECON556X
-Midterm Project in Advanced Data Analytics using R. 
-Topics include Linear Regession, Classification, Resampling, and Linear Model Selection
+Advanced Analytics Project using randomized data sets demonstrating statistical learning methods, including Linear Regession, Classification, Resampling, and Linear Model Selection
