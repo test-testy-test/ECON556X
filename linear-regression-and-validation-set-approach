@@ -1,0 +1,115 @@
+### Linear Regression and Validation
+
+## Load data and dependencies
+```{r}
+data1_3 <- read.csv("C:/Users/zachw/Desktop/projects/Econ556XMidterm/data1_3.csv", header=TRUE)
+View(data1_3)
+
+library(stats)
+library(pROC)
+library(ggplot2)
+library(MASS)
+
+library(tidyverse)
+library(caret)
+library(caTools)
+library(ISLR)
+
+#change cateogorical binary values into numerical binary values
+data1_3$Y <- ifelse(data1_3$Y=='yes', 1, 0)
+data1_3$X2 <- ifelse(data1_3$X2=='yes', 1, 0)
+```
+
+#fitting glm, logistic regression
+```{r}
+fit.glm <- glm(Y ~ X1+X2, data=data1_3, family="binomial")
+summary(fit.glm)
+```
+
+#fitting linear discriminant analysis
+```{r}
+fit.lda <- lda(data1_3$Y ~ data1_3$X2, data=data1_3)
+fit.lda
+```
+
+#fitting quadratic discriminant analysis
+```{r}
+fit.qda = qda(data1_3$Y ~ data1_3$X2, data=data1_3)
+fit.qda 
+```
+
+#validation set approach for three models
+```{r}
+##convert first subset of data set to data frame. This will be our training set
+data_1 <- data.frame(data1_3$Y, data1_3$X1, data1_3$X2)[1:500, ]
+train <- data_1
+
+##convert second subset of data set to data frame. This will be our test set
+data_2 <- data.frame(data1_3$Y, data1_3$X1, data1_3$X2)[501:1000, ]
+test <- data_2
+
+#validation for logistic regression
+probs <- predict(fit.glm, type="response")
+pred.glm <- rep("0", length(probs))
+pred.glm[probs > 0.5] <- "1"
+table(pred.glm, data1_3$Y)
+```
+>We can conclude that the number of correct predictions on this training data is (885+4)=889. The percentage of correct predictions on this training data is (889/1000)=88.9%. 
+
+>This implies that 11.1% is the error rate in the training data.
+
+>However, a closer look at the confusion matrix reveals a shockingly large number of false negatives, and a comparitvely small number of false positives. When the true response is 'yes', we are correct only (4/(4+108))=4.46% of the time. When the true response is 'no', we are correct (885/(885+3))=99.55% of the time. 
+
+```{r}
+#validation for LDA
+pred.lda <- predict(fit.lda, test)
+class.lda = pred.lda$class
+table(class.lda, data1_3$Y)
+```
+>We can conclude that the number of correct predictions on this training data is 888. The percentage of correct predictions on this training data is (888/1000)=88.8%. 
+
+>This implies that 11.2% is the error rate in the training data.
+
+>While there are zero false positives, there are numerous false negatives (112). When the true response is 'yes', we are correct 0% of the time. When the true response is 'no', we are correct 100% of the time. 
+
+```{r}
+#validation for QDA
+pred.qda <- predict(fit.qda, test)
+class.qda = pred.qda$class
+table(class.qda, data1_3$Y)
+```
+>We can conclude that the number of correct predictions on this training data is 888. The percentage of correct predictions on this training data is (888/1000)=88.8%. 
+
+>This implies that 11.2% is the error rate in the training data.
+
+>While there are zero false positives, there are numerous false negatives (112). When the true response is 'yes', we are correct 0% of the time. When the true response is 'no', we are correct 100% of the time. 
+
+```{r}
+#ROC for logistic regression
+
+##create model using training data based on binomial error distribution. This will be used to predict responses on the test data based on the training data
+model.glm <- glm(data1_3.Y ~ data1_3.X1 + data1_3.X2, family="binomial", data=train)
+
+##Next, create predictions from the results of the previous model fitting function. Using model data, we will predict responses on the test input data
+predicted.glm <- predict(model.glm, test, type="response")
+
+##building an ROC curve to return (plot) an ROC object based on predictor data fitted on the response
+rocobj.glm <- roc(test$data1_3.Y, predicted.glm)
+ggroc(rocobj.glm)
+
+
+#ROC for LDA
+model.lda <- lda(data1_3.Y ~ data1_3.X1 + data1_3.X2, family="binomial", data=train)
+predicted.lda <- predict(model.lda, test, type="response")
+predicted.lda <- as.numeric(as.character(unlist(predicted.lda)))
+rocobj.lda <- roc(test$data1_3.Y, predicted.lda[501:1000])
+ggroc(rocobj.lda)
+
+#ROC for QDA
+model.qda <- qda(data1_3.Y ~ data1_3.X1 + data1_3.X2, family="binomial", data=train)
+predicted.qda <- predict(model.qda, test, type="response")
+predicted.qda <- as.numeric(as.character(unlist(predicted.qda)))
+rocobj.qda <- roc(test$data1_3.Y, predicted.qda[501:1000])
+ggroc(rocobj.qda)
+```
+>Based on the previous confusion matrices and ROCs, it would be advisalbe to select logsitic regression. While this indeed yields a negligibe amount of false negatives (while QDA and LDA both yield zero), the error training rate of logistic regression is lower, even if by .1%.
